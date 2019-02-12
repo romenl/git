@@ -1309,7 +1309,9 @@ static size_t proxy_out(char *buffer, size_t eltsize,
 static int proxy_request(struct proxy_state *p)
 {
 	struct active_request_slot *slot;
+	int err;
 
+retry:
 	slot = get_active_slot();
 
 	curl_easy_setopt(slot->curl, CURLOPT_ENCODING, "");
@@ -1326,7 +1328,12 @@ static int proxy_request(struct proxy_state *p)
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEFUNCTION, proxy_out);
 	curl_easy_setopt(slot->curl, CURLOPT_WRITEDATA, p);
 
-	if (run_slot(slot, NULL) != HTTP_OK)
+	err = run_slot(slot, NULL);
+	if (err == HTTP_REAUTH) {
+		credential_fill(&http_auth);
+		goto retry;
+	}
+	if (err != HTTP_OK)
 		return -1;
 
 	return 0;
